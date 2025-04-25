@@ -29,6 +29,41 @@ param secretname2 string
 param secretvalue2 string
 
 
+@description('The name of the log analytics workspace')
+param logAnalyticsWorkspaceName string = 'log-${appSuffix}'
+
+
+@description('The name of the Application Insights workspace')
+param appInsightsName string = 'appinsights-${appSuffix}'
+
+// Create the log analytics workspace.
+module logAnalytics 'modules/log.bicep' = {
+  name: logAnalyticsWorkspaceName
+  params: {
+    location: location
+    logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
+  }
+}
+
+// Retrive the resource already set up so secret could be read and passed to the container app environment.
+resource log 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
+  name: logAnalyticsWorkspaceName
+  dependsOn: [
+    logAnalytics
+  ]
+}
+
+// Create the application insights.
+module appInsights 'modules/appInsights.bicep' = {
+  name: appInsightsName
+  params: {
+    location: location
+    appInsightsName: appInsightsName
+  }
+  dependsOn: [
+    logAnalytics
+  ]
+}
 
 module acr 'modules/acr.bicep' = {
   name: 'acr'
@@ -52,6 +87,7 @@ resource kvResource 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
     name: keyVaultName
     dependsOn: [
       kvCreate
+      log
     ]
 }
 
@@ -73,6 +109,28 @@ resource secret_Two 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
   name: secretname2
   properties: {
     value: secretvalue2
+  }
+  dependsOn: [
+    kvResource
+  ]
+}
+
+resource secret_logCustomerKey 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
+  parent: kvResource
+  name: 'logCustomerKey'
+  properties: {
+    value: log.properties.customerId
+  }
+  dependsOn: [
+    kvResource
+  ]
+}
+
+resource secret_logSharedKey 'Microsoft.KeyVault/vaults/secrets@2024-11-01' = {
+  parent: kvResource
+  name: 'logSharedKey'
+  properties: {
+    value: log.listKeys().primarySharedKey
   }
   dependsOn: [
     kvResource

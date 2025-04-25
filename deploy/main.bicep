@@ -4,12 +4,6 @@ param appSuffix string = uniqueString(resourceGroup().id)
 @description('The location to deploy all my resources')
 param location string = resourceGroup().location
 
-@description('The name of the log analytics workspace')
-param logAnalyticsWorkspaceName string = 'log-${appSuffix}'
-
-@description('The name of the Application Insights workspace')
-param appInsightsName string = 'appinsights-${appSuffix}'
-
 @description('The name of the Container App Environment')
 param containerAppEnvironmentName string = 'env${appSuffix}'
 
@@ -18,9 +12,6 @@ param keyVaultName string = 'kv${appSuffix}'
 
 @description('ACR registry name.')
 param containerRegistry string 
-
-var containerRegistryName = '${containerRegistry}${appSuffix}'
-
 
 @description('The name of the user assigned identity')
 param userAssignedIdentityName string = 'identity-${appSuffix}'
@@ -32,22 +23,17 @@ param imageTag string = 'latest'
 param imageName string = 'sampleprojects'
 
 var containerAppName = 'sampleapp-${appSuffix}'
+@description('The name of the log analytics workspace')
+param logAnalyticsWorkspaceName string = 'log-${appSuffix}'
 
-// Create the log analytics workspace.
-module logAnalytics 'modules/log.bicep' = {
-  name: logAnalyticsWorkspaceName
-  params: {
-    location: location
-    logAnalyticsWorkspaceName: logAnalyticsWorkspaceName
-  }
-}
+@description('The name of the Application Insights workspace')
+param appInsightsName string = 'appinsights-${appSuffix}'
+
+var containerRegistryName = '${containerRegistry}${appSuffix}'
 
 // Retrive the resource already set up so secret could be read and passed to the container app environment.
 resource log 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: logAnalyticsWorkspaceName
-  dependsOn: [
-    logAnalytics
-  ]
 }
 
 
@@ -56,17 +42,7 @@ resource kv 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
   name: keyVaultName
 }
 
-// Create the application insights.
-module appInsights 'modules/appInsights.bicep' = {
-  name: appInsightsName
-  params: {
-    location: location
-    appInsightsName: appInsightsName
-  }
-  dependsOn: [
-    logAnalytics
-  ]
-}
+
 
 module containerAppEnvironment 'modules/appEnvironment.bicep' = {
   name: containerAppEnvironmentName
@@ -95,7 +71,7 @@ module ca 'modules/containerApp.bicep' = {
 
   }
   dependsOn: [
-    appInsights
+    log
     containerAppEnvironment
   ]
 }
